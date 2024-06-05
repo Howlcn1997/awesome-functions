@@ -1,4 +1,5 @@
-import { isEqual, debounce } from 'lodash';
+import isEqual from 'lodash/isEqual';
+import debounce from 'lodash/debounce';
 import { promiseHijack } from './promiseHijack';
 
 const UNTERMINATED = 0;
