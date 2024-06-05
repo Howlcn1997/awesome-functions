@@ -5,6 +5,9 @@ const UNTERMINATED = 0;
 const TERMINATED = 1;
 const ERRORED = 2;
 
+const NORMAL = 'normal';
+const CACHE_FIRST = 'cache-first';
+
 function createCacheStoreValue(e) {
   return {
     s: UNTERMINATED, // status
@@ -14,20 +17,29 @@ function createCacheStoreValue(e) {
 }
 
 /**
- * 缓存优先函数
- * - 若缓存不存在，则等待promiseFn执行完成后返回结果 并 缓存
- * - 若缓存存在且未过期，则直接返回缓存结果
- * - 若缓存存在但已过期，先返回缓存结果，再等待promiseFn执行完成后更新缓存
- *
  * @param {Function} promiseFn
  * @param {Number} options.ttl 缓存有效时长（ms），默认0，当为Infinity时永久缓存
+ * @param {String} options.mode 缓存执行策略 默认normal
+ *    - normal:
+ *      - 若缓存不存在或缓存过期，则等待promiseFn执行完成后返回结果 并 缓存
+ *      - 若缓存存在且未过期，则直接返回缓存结果
+ *    - cache-first:
+ *      - 若缓存不存在，则等待promiseFn执行完成后返回结果 并 缓存
+ *      - 若缓存存在且未过期，则直接返回缓存结果
+ *      - 若缓存存在但已过期，先返回缓存结果，再等待promiseFn执行完成后更新缓存
  * @param {Number} options.gcThrottle 垃圾回收节流时间（ms），默认600000，当为Infinity时不进行垃圾回收
  * @param {Function} options.cacheFulfilled 是否缓存正常结果，默认true (...arguments) => boolean
  * @param {Function} options.cacheRejected 是否缓存异常结果，默认true (...arguments) => boolean
  * @returns
  */
-export function promiseCacheCFR(promiseFn, options) {
-  const { ttl = 0, gcDebounce = 600000, cacheRejected = () => true, cacheFulfilled = () => true } = options || {};
+export function promiseCache(promiseFn, options) {
+  const {
+    ttl = 0,
+    gcDebounce = 600000,
+    mode = NORMAL,
+    cacheRejected = () => true,
+    cacheFulfilled = () => true,
+  } = options || {};
 
   const cacheStore = new Map();
 
@@ -55,7 +67,10 @@ export function promiseCacheCFR(promiseFn, options) {
     }
 
     const isExpired = result.e < now;
-    if (isExpired) {
+    if (isExpired && mode === NORMAL) {
+      return runAndSetCache(args);
+    }
+    if (isExpired && mode === CACHE_FIRST) {
       runAndSetCache(args);
     }
 
@@ -65,13 +80,13 @@ export function promiseCacheCFR(promiseFn, options) {
     async function runAndSetCache(selfArgs) {
       result.e = expireTime;
       return promiseFn.apply(null, selfArgs).then(
-        value => {
+        (value) => {
           result.v = value;
           result.s = TERMINATED;
           if (cacheFulfilled(...selfArgs)) cacheStore.set(selfArgs, result);
           return value;
         },
-        error => {
+        (error) => {
           result.v = error;
           result.s = ERRORED;
           if (cacheRejected(...selfArgs)) cacheStore.set(selfArgs, result);

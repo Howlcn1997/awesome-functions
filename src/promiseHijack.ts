@@ -1,18 +1,14 @@
-import { isEqual } from "lodash";
+import isEqual from 'lodash/isEqual';
 
 export function promiseHijack(promiseFn) {
   const pendingMap = new Map(); // [arguments => [{ resolve, reject }]]
 
   return function () {
     let [targetArguments, targetValue] =
-      Array.from(pendingMap.entries()).find(([key]) =>
-        isEqual(key, arguments)
-      ) || [];
+      Array.from(pendingMap.entries()).find(([key]) => isEqual(key, arguments)) || [];
 
     if (targetArguments) {
-      return new Promise((resolve, reject) =>
-        targetValue.push({ resolve, reject })
-      );
+      return new Promise((resolve, reject) => targetValue.push({ resolve, reject }));
     }
 
     return new Promise((resolve, reject) => {
