@@ -1,5 +1,4 @@
-import isEqual from 'lodash/isEqual';
-import debounce from 'lodash/debounce';
+import { isEqual, debounce } from 'lodash';
 import { promiseHijack } from './promiseHijack';
 
 const UNTERMINATED = 0;
@@ -9,12 +8,20 @@ const ERRORED = 2;
 const NORMAL = 'normal';
 const CACHE_FIRST = 'cache-first';
 
-function createCacheStoreValue(e) {
+function createCacheStoreValue(e: number) {
   return {
     s: UNTERMINATED, // status
     v: undefined, // value
     e, // expire
   };
+}
+
+interface Options {
+  ttl?: number;
+  gcDebounce?: number;
+  mode?: string;
+  cacheRejected?: (...args: any[]) => boolean;
+  cacheFulfilled?: (...args: any[]) => boolean;
 }
 
 /**
@@ -33,14 +40,8 @@ function createCacheStoreValue(e) {
  * @param {Function} options.cacheRejected 是否缓存异常结果，默认true (...arguments) => boolean
  * @returns
  */
-export function promiseCache(promiseFn, options) {
-  const {
-    ttl = 0,
-    gcDebounce = 600000,
-    mode = NORMAL,
-    cacheRejected = () => true,
-    cacheFulfilled = () => true,
-  } = options || {};
+export function promiseCache(promiseFn: (...args: any[]) => Promise<any>, options: Options = {}) {
+  const { ttl = 0, gcDebounce = 600000, mode = NORMAL, cacheRejected = () => true, cacheFulfilled = () => true } = options;
 
   const cacheStore = new Map();
 
@@ -52,42 +53,40 @@ export function promiseCache(promiseFn, options) {
     }
   }, gcDebounce);
 
-  return promiseHijack(function () {
+  return promiseHijack(function (...thisArgs: any[]) {
     if (gcDebounce !== Infinity) queueMicrotask(callGC);
 
     const now = Date.now();
     const expireTime = ttl === Infinity ? Infinity : now + ttl;
 
-    const [args, result] = Array.from(cacheStore.entries()).find(([args]) => isEqual(args, arguments)) || [
-      arguments,
-      createCacheStoreValue(expireTime),
-    ];
+    const [currentArgs, result] = Array.from(cacheStore.entries()).find(([args]) => isEqual(args, thisArgs)) || [thisArgs, createCacheStoreValue(expireTime)];
 
     if (result.s === UNTERMINATED) {
-      return runAndSetCache(args);
+      return runAndSetCache(currentArgs);
     }
 
     const isExpired = result.e < now;
     if (isExpired && mode === NORMAL) {
-      return runAndSetCache(args);
+      return runAndSetCache(currentArgs);
     }
     if (isExpired && mode === CACHE_FIRST) {
-      runAndSetCache(args);
+      runAndSetCache(currentArgs);
     }
 
     if (result.s === TERMINATED) return Promise.resolve(result.v);
-    if (result.s === ERRORED) return Promise.reject(result.v);
+    // if (result.s === ERRORED)
+    return Promise.reject(result.v);
 
-    async function runAndSetCache(selfArgs) {
+    async function runAndSetCache(selfArgs: IArguments) {
       result.e = expireTime;
-      return promiseFn.apply(null, selfArgs).then(
-        (value) => {
+      return promiseFn.apply(null, selfArgs as any).then(
+        (value: any) => {
           result.v = value;
           result.s = TERMINATED;
           if (cacheFulfilled(...selfArgs)) cacheStore.set(selfArgs, result);
           return value;
         },
-        (error) => {
+        (error: any) => {
           result.v = error;
           result.s = ERRORED;
           if (cacheRejected(...selfArgs)) cacheStore.set(selfArgs, result);
