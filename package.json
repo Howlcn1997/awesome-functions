@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "license": "MIT",
   "private": true,
-  "scripts": {},
+  "scripts": {
+    "test": "ts-node ./test/cache.ts"
+  },
   "devDependencies": {
     "@babel/plugin-transform-modules-commonjs": "^7.24.7",
     "@types/lodash": "^4.17.4",

@@ -16,7 +16,7 @@ export function promiseHijack(promiseFn: (...args: any[]) => Promise<any>, optio
     let [targetArguments, targetValue] = Array.from(pendingMap.entries()).find(([key]) => options.isEqual(key, args)) || [];
 
     if (targetArguments && targetValue) {
-      return new Promise((resolve, reject) => targetValue.push({ resolve, reject }));
+      return new Promise((resolve, reject) => targetValue!.push({ resolve, reject }));
     }
 
     return new Promise((resolve, reject) => {
