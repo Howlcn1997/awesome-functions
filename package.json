@@ -4,14 +4,25 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "test": "ts-node ./test/cache.ts"
+    "jest": "jest"
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    }
   },
   "devDependencies": {
     "@babel/plugin-transform-modules-commonjs": "^7.24.7",
+    "@babel/preset-typescript": "^7.24.7",
+    "@types/jest": "^29.5.12",
     "@types/lodash": "^4.17.4",
-    "ts-node": "^10.9.2"
+    "ts-jest": "^29.1.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.2"
   },
   "dependencies": {
+    "@babel/core": "^7.24.7",
+    "@babel/preset-env": "^7.24.7",
     "lodash": "^4.17.21"
   }
 }

@@ -1,16 +1,17 @@
 {
-    "compilerOptions": {
-        "declaration": true,
-        "declarationMap": true,
-        "emitDeclarationOnly": true,
-        "esModuleInterop": true,
-        "lib": ["dom", "es2015", "es2016", "es2017", "es2018", "es2019", "es2020"],
-        "module": "commonjs",
-        "moduleResolution": "node",
-        "target": "es2020",
-        // Enhance strictness.
-        "noImplicitReturns": true,
-        "noUnusedLocals": true,
-        "strict": true,
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@styles/*": ["styles/*"],
+      "@public/*": ["public/web/*"]
     }
+  }
 }

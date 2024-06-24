@@ -62,16 +62,18 @@ function createCacheStore<A>(promiseFn?: PromiseFn, globalCache?: boolean): Map<
  * @param {Function} promiseFn
  * @param {Number} options.maxAge 缓存有效时长（ms），默认0，当为Infinity时永久缓存
  * @param {Number} options.swr 缓存过期容忍时长（ms），默认0
- * @param {Number} options.sie 更新错误容忍时长（ms），默认0
- * @param {Number} options.gcThrottle 垃圾回收节流时长（ms），默认Infinity
+ * @param {Number} options.sie 更新错误容忍时长（ms），默认Infinity
+ * @param {Number} options.gcThrottle 垃圾回收节流时长（ms），默认0，为0时不进行垃圾回收
  *
  * @param {Function} options.cacheRejected 是否缓存异常结果，默认true (...arguments) => boolean
  * @returns
  */
 export function cache(promiseFn: PromiseFn, options: Options = {}) {
-  const { maxAge = 0, swr = 0, sie = 0, globalCache = false, gcThrottle = Infinity, cacheFulfilled = () => true } = options;
+  const { maxAge = 0, swr = 0, sie = 0, globalCache = false, gcThrottle = 0, cacheFulfilled = () => true } = options;
 
   const cacheStore = createCacheStore<any[]>(promiseFn, globalCache);
+
+  promiseFn = promiseHijack(promiseFn);
 
   const callGC = throttle(() => {
     const now = Date.now();
@@ -82,7 +84,7 @@ export function cache(promiseFn: PromiseFn, options: Options = {}) {
   }, gcThrottle);
 
   return promiseHijack(function (...args: any[]) {
-    if (gcThrottle !== Infinity) queueMicrotask(callGC);
+    if (gcThrottle !== 0) queueMicrotask(callGC);
 
     const [currentArgs, result] = Array.from(cacheStore.entries()).find(([a]) => isEqual(a, args)) || [args, createCacheNode(maxAge, swr, sie)];
 
@@ -105,11 +107,9 @@ export function cache(promiseFn: PromiseFn, options: Options = {}) {
       return response(result);
     }
 
-    return update(currentArgs).catch(() => {
-      const now = Date.now();
-      result.swr = 0;
-      result.sie = now + result._sie;
-      return response(result);
+    return update(currentArgs).catch((error) => {
+      cacheStore.delete(currentArgs);
+      throw error;
     });
 
     function response(result: CacheNode): Promise<CacheNode['v']> {
