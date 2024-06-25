@@ -27,7 +27,7 @@ function createCacheNode(maxAge: number, swr: number = 0, sie: number = 0): Cach
     e: now + maxAge, // expire
     swr: 0,
     sie: 0,
-    
+
     _maxAge: maxAge,
     _swr: swr,
     _sie: sie,
@@ -43,22 +43,24 @@ interface Options {
 
   cacheFulfilled?: (args: any[], value: any) => boolean;
   cacheRejected?: (args: any[], error: any) => boolean;
+  argsEqual?: (a: any[], b: any[]) => boolean;
+  storeCreator?: (promiseFn: PromiseFn, globalCache?: boolean) => any;
 }
 
 type PromiseFn = (...args: any[]) => Promise<any>;
 
 const globalCacheStore = new Map();
 
-function createCacheStore<A>(promiseFn?: PromiseFn, globalCache?: boolean): Map<A, CacheNode> {
+function createCacheStore(promiseFn?: PromiseFn, globalCache?: boolean): Map<any, CacheNode> {
   if (globalCache) {
     let cacheStore = globalCacheStore.get(promiseFn);
     if (cacheStore) return cacheStore;
 
-    cacheStore = new Map<A, CacheNode>();
+    cacheStore = new Map<any, CacheNode>();
     globalCacheStore.set(promiseFn, cacheStore);
     return cacheStore;
   }
-  return new Map<A, CacheNode>();
+  return new Map<any, CacheNode>();
 }
 
 /**
@@ -73,9 +75,19 @@ function createCacheStore<A>(promiseFn?: PromiseFn, globalCache?: boolean): Map<
  * @returns
  */
 export function cache(promiseFn: PromiseFn, options: Options = {}) {
-  const { maxAge = 0, swr = 0, sie = 0, globalCache = false, gcThrottle = 0, cacheFulfilled = () => true, cacheRejected = () => false } = options;
+  const {
+    maxAge = 0,
+    swr = 0,
+    sie = 0,
+    globalCache = false,
+    gcThrottle = 0,
+    cacheFulfilled = () => true,
+    cacheRejected = () => false,
+    argsEqual = isEqual,
+    storeCreator = createCacheStore,
+  } = options;
 
-  const cacheStore = createCacheStore<any[]>(promiseFn, globalCache);
+  const cacheStore = storeCreator(promiseFn, globalCache) as Map<any, CacheNode>;
 
   promiseFn = promiseHijack(promiseFn);
 
@@ -90,7 +102,7 @@ export function cache(promiseFn: PromiseFn, options: Options = {}) {
   return promiseHijack(function (...args: any[]) {
     if (gcThrottle !== 0) queueMicrotask(callGC);
 
-    const [currentArgs, result] = Array.from(cacheStore.entries()).find(([a]) => isEqual(a, args)) || [args, createCacheNode(maxAge, swr, sie)];
+    const [currentArgs, result] = Array.from(cacheStore.entries()).find(([a]) => argsEqual(a, args)) || [args, createCacheNode(maxAge, swr, sie)];
 
     if (result.s === Status.UNTERMINATED) {
       return update(currentArgs);
